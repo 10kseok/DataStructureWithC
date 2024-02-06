@@ -109,7 +109,7 @@ void rbtree_insert_fixup(rbtree *t, node_t *z)
                 z = z->parent->parent;
             }
             else{
-                if (z->color == z->parent->left->color)
+                if (z == z->parent->left)
                 {
                     z = z->parent;
                     right_rotate(t, z);
