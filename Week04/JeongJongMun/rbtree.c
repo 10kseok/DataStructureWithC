@@ -3,10 +3,30 @@
 #include <stdbool.h>
 #include <stdio.h>
 
+// 헤더 파일에 없는 내부 함수들과 구조체를 정의
+typedef enum
+{
+  LEFT,
+  RIGHT
+} dir_t;
+void rotate(rbtree *t, node_t *x, dir_t dir);
+void exchange_color(node_t *a, node_t *b);
+void recoloring(node_t *a, node_t *b, node_t *c);
+void rbtree_insert_fixup(rbtree *t, node_t *x);
+void rbtree_delete_fixup(rbtree *t, node_t *x);
+
 rbtree *new_rbtree(void)
 {
   rbtree *t = (rbtree *)calloc(1, sizeof(rbtree));
   node_t *nil = (node_t *)calloc(1, sizeof(node_t));
+  // 트리 혹은 nil 노드가 할당되지 않은 경우 (메모리가 부족한 경우) 정상적으로 실행되지 않도록 처리
+  if (t == NULL || nil == NULL)
+  {
+    free(t);
+    free(nil);
+    return NULL;
+  }
+
   t->root = t->nil = nil;    // 트리의 nill과 루트를 nil 노드로 설정
   nil->color = RBTREE_BLACK; // nil 노드는 항상 검은색
 
@@ -31,13 +51,23 @@ void delete_rbtree(rbtree *t)
   free(t);
 }
 
-typedef enum
-{
-  LEFT,
-  RIGHT
-} dir_t;
+// 회전 시 아래로 내려가는 노드를 x, 위로 올라가는 노드를 y, 회전 시에 y에서 x로 이동하는 노드를 beta라고 가정
+// 좌회전, 우회전 모두 x를 기준으로 원하는 방향으로 회전
+/*
+  [Left Rotation]
+  x               y
+   \             / \
+    y     =>    x   c
+   / \           \
+  b   c           b
 
-// 위에 있는 노드 x를 기준으로 원하는 방향으로 회전
+  [Right Rotation]
+      x           y
+     /           / \
+    y     =>    a   x
+   / \             /
+  a   b           b
+*/
 void rotate(rbtree *t, node_t *x, dir_t dir)
 {
   node_t *y = dir ? x->left : x->right;
@@ -45,22 +75,22 @@ void rotate(rbtree *t, node_t *x, dir_t dir)
 
   // 1-1) y의 부모를 x의 부모로 변경
   y->parent = x->parent;
-  // 1-2) x의 부모가 루트인 경우: y가 새로운 루트가 된다
+  // 1-2-1) x의 부모가 루트인 경우: y가 새로운 루트
   if (x == t->root)
     t->root = y;
-  // x가 부모의 왼쪽 자식인 경우
+  // 1-2-2) x가 부모의 왼쪽 자식인 경우: y가 x의 부모의 왼쪽 자식
   else if (x == x->parent->left)
     x->parent->left = y;
-  // x가 부모의 오른쪽 자식인 경우
+  // 1-2-3) x가 부모의 오른쪽 자식인 경우: y가 x의 부모의 오른쪽 자식
   else
     x->parent->right = y;
 
-  // 2) x의 자식을 y의 자식으로 변경
+  // 2) x의 자식을 y의 자식으로 변경 (양방향 연결)
   dir ? (x->left = beta) : (x->right = beta);
   if (beta != t->nil)
     beta->parent = x;
 
-  // 3) y의 자식을 x로 변경
+  // 3) y의 자식을 x로 변경 (양방향 연결)
   dir ? (y->right = x) : (y->left = x);
   x->parent = y;
 }
@@ -68,14 +98,14 @@ void rotate(rbtree *t, node_t *x, dir_t dir)
 // a와 b의 색을 교환
 void exchange_color(node_t *a, node_t *b)
 {
-  int tmp = a->color;
+  color_t tmp_color = a->color;
   a->color = b->color;
-  b->color = (tmp == RBTREE_BLACK) ? RBTREE_BLACK : RBTREE_RED;
+  b->color = tmp_color;
 }
 // b와 c의 색을 a로 변경하고 a의 색을 b로 변경
 void recoloring(node_t *a, node_t *b, node_t *c)
 {
-  int tmp = a->color;
+  color_t tmp = a->color;
   a->color = b->color;
   b->color = c->color = tmp;
 }
@@ -158,7 +188,7 @@ node_t *rbtree_insert(rbtree *t, const key_t key)
     parent->left = new_node; // 새 노드를 왼쪽 자식으로 추가
   else
     parent->right = new_node; // 새 노드를 오른쪽 자식으로 추가
-    
+
   // 불균형 복구
   rbtree_insert_fixup(t, new_node);
 
@@ -297,25 +327,25 @@ void rbtree_delete_fixup(rbtree *t, node_t *x)
   x->color = RBTREE_BLACK;
 }
 
-int rbtree_erase(rbtree *t, node_t *p)
+int rbtree_erase(rbtree *t, node_t *target)
 {
-  node_t *y = p;
+  node_t *y = target;
   node_t *x;
   color_t yOriginalColor = y->color;
 
-  if (p->left == t->nil)
+  if (target->left == t->nil)
   {
-    x = p->right;
-    rb_transplant(t, p, p->right);
+    x = target->right;
+    rb_transplant(t, target, target->right);
   }
-  else if (p->right == t->nil)
+  else if (target->right == t->nil)
   {
-    x = p->left;
-    rb_transplant(t, p, p->left);
+    x = target->left;
+    rb_transplant(t, target, target->left);
   }
   else
   {
-    y = p->right;
+    y = target->right;
     while (y->left != t->nil)
     {
       y = y->left;
@@ -323,21 +353,21 @@ int rbtree_erase(rbtree *t, node_t *p)
     yOriginalColor = y->color;
     x = y->right;
 
-    if (y->parent == p)
+    if (y->parent == target)
     {
       x->parent = y;
     }
     else
     {
       rb_transplant(t, y, y->right);
-      y->right = p->right;
+      y->right = target->right;
       y->right->parent = y;
     }
 
-    rb_transplant(t, p, y);
-    y->left = p->left;
+    rb_transplant(t, target, y);
+    y->left = target->left;
     y->left->parent = y;
-    y->color = p->color;
+    y->color = target->color;
   }
 
   if (yOriginalColor == RBTREE_BLACK)
@@ -345,12 +375,13 @@ int rbtree_erase(rbtree *t, node_t *p)
     rbtree_delete_fixup(t, x);
   }
 
-  free(p);
+  free(target);
 
   return 0;
 }
 
-void inorder(const rbtree *t, node_t *node, key_t *arr, const size_t n, size_t *cnt)
+// 중위 순회하며 배열에 키를 저장하는 함수
+void inorder(const rbtree *t, node_t *node, key_t *arr, const size_t n, int *cnt)
 {
   if (*cnt == n || node == t->nil)
     return;
@@ -358,10 +389,10 @@ void inorder(const rbtree *t, node_t *node, key_t *arr, const size_t n, size_t *
   arr[(*cnt)++] = node->key;
   inorder(t, node->right, arr, n, cnt);
 }
-// 트리를 중위 순회하며 n개의 키를 배열 arr에 저장
+// 트리에서 n개의 키를 배열 arr에 오름차순으로 저장하는 함수
 int rbtree_to_array(const rbtree *t, key_t *arr, const size_t n)
 {
-  size_t cnt = 0;
+  int cnt = 0;
   inorder(t, t->root, arr, n, &cnt);
 
   return 0;
