@@ -1,15 +1,15 @@
-.PHONY: test
+.PHONY: test clean
 
-CFLAGS=-I ../src -Wall -g -DSENTINEL
+CFLAGS=-I ../common -Wall -O -DSENTINEL
 
 test: test-rbtree
 	./test-rbtree
-	valgrind ./test-rbtree
-
-test-rbtree: test-rbtree.o ../src/rbtree.o
-
-../src/rbtree.o:
-	$(MAKE) -C ../src rbtree.o
+	valgrind -s --leak-check=full ./test-rbtree
 
 clean:
 	rm -f test-rbtree *.o
+
+test-rbtree: test-rbtree.o rbtree.o
+
+test-rbtree.o: ../common/test-rbtree.c
+	$(CC) $(CFLAGS) -c ../common/test-rbtree.c
